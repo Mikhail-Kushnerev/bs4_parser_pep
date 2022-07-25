@@ -10,13 +10,14 @@ from bs4 import BeautifulSoup as BS
 
 from constants import (
     DOWNLOADS_DIR,
+    BASE_DIR,
     MAIN_DOC_URL,
-    PEP_INFO_URL,
+    PEP,
     EXPECTED_STATUS,
     PATTERN
 )
 from configs import configure_argument_parser, configure_logging
-from outputs import build_table
+from outputs import control_output
 from utils import get_response, find_tag
 
 
@@ -31,8 +32,7 @@ def whats_new(session):
     div_tag = find_tag(section_tag, "div", attrs={"class": "toctree-wrapper compound"})
     li_tag = div_tag.find_all("li", class_="toctree-l1")
     results = [
-        "whats_new",
-        ('Ссылка на статью', 'Заголовок', 'Редактор, автор')
+        ('Ссылка на статью', 'Заголовок', 'Редактор, Автор')
     ]
     for i in tqdm(li_tag):
         a_tag = find_tag(i, "a")["href"]
@@ -68,7 +68,6 @@ def latest_versions(session):
 
     pattern = r"Python\s([\d\.]+)\s\((\w{1,}.*)\)"
     results = [
-        "latest_versions",
         ('Ссылка на документацию', 'Версия', 'Статус')
     ]
     for i in tqdm(all_a_tags, desc="Разбор содержимого тэга 'a'"):
@@ -98,6 +97,10 @@ def download(session):
 
     download_link = urljoin(downloads_url, pdf_link)
     obj_name = download_link.split("/")[-1]
+
+    DOWNLOADS_DIR = BASE_DIR / "downloads"
+    DOWNLOADS_DIR.mkdir(exist_ok=True)
+
     archive_path = DOWNLOADS_DIR / obj_name
     download = session.get(download_link)
     with open(archive_path, mode='wb') as file:
@@ -106,7 +109,7 @@ def download(session):
 
 
 def pep(session):
-    response = get_response(session, PEP_INFO_URL)
+    response = get_response(session, PEP)
     if response is None:
         return
     soup = BS(response.text, "lxml")
@@ -114,10 +117,10 @@ def pep(session):
     body_table = find_tag(section_tag, "tbody")
     rows = body_table.find_all("tr")
     for i in rows:
-        object = i.find("td")
+        object = find_tag(i, "td")
         href_object = object.find_next_sibling("td")
         object = object.text
-        link_object = urljoin(PEP_INFO_URL, href_object.a["href"])
+        link_object = urljoin(PEP, href_object.a["href"])
         response = get_response(session, link_object)
         if response is None:
             return
@@ -160,7 +163,7 @@ def main():
     parser_mode = args.mode
     results = MODE_TO_FUNCTION[parser_mode](session)
     if results:
-        build_table(results, args)
+        control_output(results, args)
     logging.info('Парсер завершил работу.')
 
 
