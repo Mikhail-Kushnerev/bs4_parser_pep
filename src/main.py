@@ -6,10 +6,9 @@ import logging
 
 from tqdm import tqdm
 from urllib.parse import urljoin
-from bs4 import BeautifulSoup as BS
+from bs4 import BeautifulSoup as Bs
 
 from constants import (
-    DOWNLOADS_DIR,
     BASE_DIR,
     MAIN_DOC_URL,
     PEP,
@@ -27,9 +26,16 @@ def whats_new(session):
     if response is None:
         return
 
-    soup = BS(response.text, "lxml")
-    section_tag = find_tag(soup, "section", attrs={"id": "what-s-new-in-python"})
-    div_tag = find_tag(section_tag, "div", attrs={"class": "toctree-wrapper compound"})
+    soup = Bs(response.text, "lxml")
+    section_tag = find_tag(
+        soup,
+        "section",
+        attrs={"id": "what-s-new-in-python"}
+    )
+    div_tag = find_tag(
+        section_tag, "div",
+        attrs={"class": "toctree-wrapper compound"}
+    )
     li_tag = div_tag.find_all("li", class_="toctree-l1")
     results = [
         ('Ссылка на статью', 'Заголовок', 'Редактор, Автор')
@@ -41,7 +47,7 @@ def whats_new(session):
         response = get_response(session, string)
         if response is None:
             return
-        soup = BS(response.text, "lxml")
+        soup = Bs(response.text, "lxml")
         h1 = find_tag(soup, "h1")
         dl = find_tag(soup, "dl")
         dl_text = dl.text.replace('\n', ' ')
@@ -55,7 +61,7 @@ def latest_versions(session):
     response = get_response(session, MAIN_DOC_URL)
     if response is None:
         return
-    soup = BS(response.text, "lxml")
+    soup = Bs(response.text, "lxml")
 
     sidebar = find_tag(soup, "div", attrs={"class": "sphinxsidebarwrapper"})
     ul_tags = sidebar.find_all("ul")
@@ -88,7 +94,7 @@ def download(session):
     if response is None:
         return
 
-    soup = BS(response.text, "lxml")
+    soup = Bs(response.text, "lxml")
     main_role = find_tag(soup, "div", attrs={"role": "main"})
     table = find_tag(main_role, "table", attrs={"class": "docutils"})
     pattern: Pattern[str] = re.compile('.*pdf-a4\.zip$')
@@ -98,10 +104,10 @@ def download(session):
     download_link = urljoin(downloads_url, pdf_link)
     obj_name = download_link.split("/")[-1]
 
-    DOWNLOADS_DIR = BASE_DIR / "downloads"
-    DOWNLOADS_DIR.mkdir(exist_ok=True)
+    downloads_dir = BASE_DIR / "downloads"
+    downloads_dir.mkdir(exist_ok=True)
 
-    archive_path = DOWNLOADS_DIR / obj_name
+    archive_path = downloads_dir / obj_name
     download = session.get(download_link)
     with open(archive_path, mode='wb') as file:
         file.write(download.content)
@@ -112,23 +118,28 @@ def pep(session):
     response = get_response(session, PEP)
     if response is None:
         return
-    soup = BS(response.text, "lxml")
+
+    soup = Bs(response.text, "lxml")
     section_tag = find_tag(soup, "section", attrs={"id": "numerical-index"})
     body_table = find_tag(section_tag, "tbody")
     rows = body_table.find_all("tr")
-    for i in rows:
-        object = find_tag(i, "td")
+
+    counter = {}
+    for string in rows:
+        object = find_tag(string, "td")
         href_object = object.find_next_sibling("td")
         object = object.text
+
         link_object = urljoin(PEP, href_object.a["href"])
         response = get_response(session, link_object)
         if response is None:
             return
-        soup = BS(response.text, "lxml")
+
+        soup = Bs(response.text, "lxml")
         start = find_tag(soup, text=PATTERN).parent
         dt = start.find_next_sibling("dd").text
         if len(object) > 1 and dt not in EXPECTED_STATUS[object[1]]:
-            text = ''.join(
+            error_msg = ''.join(
                 (
                     "\nНесовпадающие статусы:\n",
                     f"\t{link_object}\n",
@@ -136,9 +147,15 @@ def pep(session):
                     f"\tОжадиаемые статусы: {EXPECTED_STATUS[object[1]]}"
                 )
             )
-            logging.info(text)
-        print(dt)
-        # time.sleep(10)
+            logging.info(error_msg)
+            continue
+        counter[dt] = 1 if dt not in counter else counter[dt] + 1
+    counter["Total"] = sum([counter[i] for i in counter])
+    results = [
+        ("Статус", "Количество")
+    ]
+    results.extend([_ for _ in counter.items()])
+    return results
 
 
 MODE_TO_FUNCTION = {
