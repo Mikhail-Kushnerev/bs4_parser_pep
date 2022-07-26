@@ -24,8 +24,8 @@ def find_tag(soup, tag=None, attrs=None, text=None):
         else:
             searched_tag = soup.find(tag, attrs=(attrs or {}))
         if searched_tag is None:
-            raise
-    except:
+            raise Exception
+    except Exception:
         if text:
             error_msg = f"Тэг, имеющий текст '{text}' не найден"
         else:

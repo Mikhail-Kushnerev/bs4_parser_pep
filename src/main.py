@@ -97,7 +97,7 @@ def download(session):
     soup = Bs(response.text, "lxml")
     main_role = find_tag(soup, "div", attrs={"role": "main"})
     table = find_tag(main_role, "table", attrs={"class": "docutils"})
-    pattern: Pattern[str] = re.compile('.*pdf-a4\.zip$')
+    pattern: Pattern[str] = re.compile(r'.*pdf-a4\.zip$')
     a_tag = find_tag(table, "a", attrs={"href": pattern})
     pdf_link = a_tag["href"]
 
