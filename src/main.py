@@ -1,13 +1,13 @@
-import re
-from typing import Pattern
-
-import requests_cache
 import logging
+import re
+import requests_cache
 
-from tqdm import tqdm
+from typing import Pattern
 from urllib.parse import urljoin
 from bs4 import BeautifulSoup as Bs
+from tqdm import tqdm
 
+from configs import configure_argument_parser, configure_logging
 from constants import (
     BASE_DIR,
     MAIN_DOC_URL,
@@ -15,9 +15,8 @@ from constants import (
     EXPECTED_STATUS,
     PATTERN
 )
-from configs import configure_argument_parser, configure_logging
 from outputs import control_output
-from utils import get_response, find_tag
+from utils import get_response, find_tag, check_key
 
 
 def whats_new(session):
@@ -126,9 +125,9 @@ def pep(session):
 
     counter = {}
     for string in rows:
-        object = find_tag(string, "td")
-        href_object = object.find_next_sibling("td")
-        object = object.text
+        td_tag = find_tag(string, "td")
+        href_object = td_tag.find_next_sibling("td")
+        td_tag = td_tag.text
 
         link_object = urljoin(PEP, href_object.a["href"])
         response = get_response(session, link_object)
@@ -138,23 +137,31 @@ def pep(session):
         soup = Bs(response.text, "lxml")
         start = find_tag(soup, text=PATTERN).parent
         dt = start.find_next_sibling("dd").text
-        if len(object) > 1 and dt not in EXPECTED_STATUS[object[1]]:
-            error_msg = ''.join(
-                (
-                    "\nНесовпадающие статусы:\n",
-                    f"\t{link_object}\n",
-                    f"\tСтатус в карточке: {dt}\n",
-                    f"\tОжадиаемые статусы: {EXPECTED_STATUS[object[1]]}"
-                )
-            )
-            logging.info(error_msg)
-            continue
-        counter[dt] = 1 if dt not in counter else counter[dt] + 1
-    counter["Total"] = sum([counter[i] for i in counter])
+        match len(td_tag):
+            case 2:
+                if check_key(td_tag[1]):
+                    if dt not in EXPECTED_STATUS[td_tag[1]]:
+                        error_msg = ''.join(
+                            (
+                                "\nНесовпадающие статусы:\n",
+                                f"\t{link_object}\n",
+                                f"\tСтатус в карточке: {dt}\n",
+                                f"\tОжадиаемые статусы: "
+                                f"{EXPECTED_STATUS[td_tag[1]]}"
+                            )
+                        )
+                        logging.info(error_msg)
+                        continue
+                else:
+                    return
+            case _:
+                pass
+        counter[dt] = counter.get(dt, 0) + 1
+    counter["Total"] = sum(i for i in counter.values())
     results = [
         ("Статус", "Количество")
     ]
-    results.extend([_ for _ in counter.items()])
+    results.extend(counter.items())
     return results
 
 

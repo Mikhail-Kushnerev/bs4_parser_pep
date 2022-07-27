@@ -2,6 +2,7 @@ import logging
 
 from requests import RequestException
 
+from constants import EXPECTED_STATUS
 from exceptions import ParserFindTagException
 
 
@@ -34,3 +35,10 @@ def find_tag(soup, tag=None, attrs=None, text=None):
         raise ParserFindTagException(error_msg)
     else:
         return searched_tag
+
+
+def check_key(key):
+    if key in EXPECTED_STATUS:
+        return True
+    else:
+        raise KeyError("Такого статуса нет в словаре")
