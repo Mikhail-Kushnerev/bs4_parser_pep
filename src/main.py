@@ -128,7 +128,6 @@ def pep(session):
         td_tag = find_tag(string, "td")
         href_object = td_tag.find_next_sibling("td")
         td_tag = td_tag.text
-
         link_object = urljoin(PEP, href_object.a["href"])
         response = get_response(session, link_object)
         if response is None:
@@ -137,25 +136,18 @@ def pep(session):
         soup = Bs(response.text, "lxml")
         start = find_tag(soup, text=PATTERN).parent
         dt = start.find_next_sibling("dd").text
-        match len(td_tag):
-            case 2:
-                if check_key(td_tag[1]):
-                    if dt not in EXPECTED_STATUS[td_tag[1]]:
-                        error_msg = ''.join(
-                            (
-                                "\nНесовпадающие статусы:\n",
-                                f"\t{link_object}\n",
-                                f"\tСтатус в карточке: {dt}\n",
-                                f"\tОжадиаемые статусы: "
-                                f"{EXPECTED_STATUS[td_tag[1]]}"
-                            )
-                        )
-                        logging.info(error_msg)
-                        continue
-                else:
-                    return
-            case _:
-                pass
+        if len(td_tag) > 1 and check_key(td_tag[1]):
+            if dt not in EXPECTED_STATUS[td_tag[1]]:
+                error_msg = ''.join(
+                    (
+                        "\nНесовпадающие статусы:\n",
+                        f"\t{link_object}\n",
+                        f"\tСтатус в карточке: {dt}\n",
+                        f"\tОжадиаемые статусы: {EXPECTED_STATUS[td_tag[1]]}"
+                    )
+                )
+                logging.info(error_msg)
+                continue
         counter[dt] = counter.get(dt, 0) + 1
     counter["Total"] = sum(i for i in counter.values())
     results = [
